@@ -1,0 +1,35 @@
+{
+  "name": "project-control-system",
+  "version": "0.1.0",
+  "description": "A general project control system for organizing complex work into control docs, phase tasks, ownership, decisions, reviews, archives, and Git-backed change records.",
+  "author": {
+    "name": "Matt"
+  },
+  "skills": "./skills/",
+  "license": "MIT",
+  "keywords": [
+    "project-control",
+    "project-management",
+    "documentation",
+    "organization"
+  ],
+  "interface": {
+    "displayName": "项目总控",
+    "shortDescription": "Organize complex projects into clear control docs.",
+    "longDescription": "A general project control plugin for structuring folders, control documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records without assuming a specific project domain.",
+    "developerName": "Matt",
+    "category": "Productivity",
+    "capabilities": [
+      "Write",
+      "Review"
+    ],
+    "defaultPrompt": [
+      "Organize this project and prepare Git change records.",
+      "Create control docs, phase tasks, and ownership.",
+      "Separate current work, research, reviews, and archives."
+    ],
+    "brandColor": "#2563EB",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

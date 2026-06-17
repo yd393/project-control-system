@@ -1,0 +1,7 @@
+interface:
+  display_name: "项目总控"
+  short_description: "Organize projects into control docs"
+  default_prompt: "Use $project-control-system to organize this project into a clear control document, phase tasks, role ownership, and archives."
+
+policy:
+  allow_implicit_invocation: true
