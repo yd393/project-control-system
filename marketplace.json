@@ -1,0 +1,20 @@
+{
+  "name": "project-control-system",
+  "interface": {
+    "displayName": "Project Control System"
+  },
+  "plugins": [
+    {
+      "name": "project-control-system",
+      "source": {
+        "source": "local",
+        "path": "./plugins/project-control-system"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
