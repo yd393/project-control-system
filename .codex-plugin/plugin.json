@@ -5,6 +5,8 @@
   "author": {
     "name": "Matt"
   },
+  "homepage": "https://github.com/yd393/project-control-system",
+  "repository": "https://github.com/yd393/project-control-system",
   "skills": "./skills/",
   "license": "MIT",
   "keywords": [
