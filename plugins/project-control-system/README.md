@@ -13,13 +13,13 @@ The plugin is intentionally domain-neutral. It can be used for software, researc
 
 ## Installation
 
-This repository is intended to be used as a Codex plugin root.
-
-For local development, clone or copy the repository, then add it through your Codex plugin marketplace or local plugin workflow.
+This directory is the plugin root inside the marketplace repository. Most users should install from the repository root instead of this inner directory:
 
 ```bash
 git clone https://github.com/yd393/project-control-system.git
 cd project-control-system
+codex plugin marketplace add yd393/project-control-system --ref main
+codex plugin add project-control-system@project-control-system
 ```
 
 The plugin root is the directory that contains `.codex-plugin/plugin.json`.

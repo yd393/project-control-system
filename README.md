@@ -20,7 +20,7 @@ codex plugin add project-control-system@project-control-system
 
 ## What It Provides
 
-- A Codex marketplace entry at `marketplace.json`.
+- A Codex marketplace entry at `.agents/plugins/marketplace.json`.
 - A Codex skill for project control workflows.
 - A standard plugin manifest at `plugins/project-control-system/.codex-plugin/plugin.json`.
 - A generated icon asset for Codex plugin UI.
@@ -37,7 +37,7 @@ git clone https://github.com/yd393/project-control-system.git
 cd project-control-system
 ```
 
-The marketplace root is the repository root, which contains `marketplace.json`.
+The marketplace root is the repository root, which contains `.agents/plugins/marketplace.json`.
 The plugin root is:
 
 ```text
@@ -51,6 +51,9 @@ Do not point Codex at the inner `plugins/project-control-system/skills/project-c
 ```text
 project-control-system/
 ├── marketplace.json
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json
 ├── README.md
 └── plugins/
     └── project-control-system/
@@ -129,6 +132,7 @@ Recommended local checks before publishing:
 
 ```bash
 python3 -m json.tool marketplace.json >/dev/null
+python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/project-control-system/.codex-plugin/plugin.json >/dev/null
 python3 -m py_compile plugins/project-control-system/scripts/create_control_docs.py plugins/project-control-system/scripts/check_project_structure.py
 python3 plugins/project-control-system/scripts/create_control_docs.py /tmp/project-control-smoke --layout en
@@ -139,7 +143,7 @@ python3 plugins/project-control-system/scripts/check_project_structure.py /tmp/p
 
 Before uploading to GitHub:
 
-1. Confirm `marketplace.json` is present.
+1. Confirm `.agents/plugins/marketplace.json` is present.
 2. Confirm `plugins/project-control-system/.codex-plugin/plugin.json` is present.
 3. Confirm `plugins/project-control-system/skills/project-control-system/SKILL.md` is present.
 4. Confirm `plugins/project-control-system/assets/icon.png` is present.
