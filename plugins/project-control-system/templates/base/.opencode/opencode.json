@@ -1,0 +1,59 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    ".ai/rules/coding.md",
+    ".ai/rules/testing.md",
+    ".ai/rules/security.md",
+    ".ai/rules/git.md"
+  ],
+  "skills": {
+    "paths": [".ai/skills"]
+  },
+  "references": {
+    "project-control": {
+      "path": "./project-control",
+      "description": "Project status, roadmap, backlog, decisions, and handoff notes"
+    },
+    "context": {
+      "path": "./.ai/context",
+      "description": "Project architecture, domain knowledge, and technical decisions"
+    },
+    "templates": {
+      "path": "./.ai/templates",
+      "description": "Reusable templates for features, bugs, and pull requests"
+    }
+  },
+  "agent": {
+    "frontend": {
+      "mode": "subagent",
+      "description": "Frontend implementation and visual inspection"
+    },
+    "backend": {
+      "mode": "subagent",
+      "description": "API, database, and server-side implementation"
+    },
+    "tester": {
+      "mode": "subagent",
+      "description": "Testing strategy and regression validation"
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Code review and risk inspection"
+    }
+  },
+  "command": {
+    "implement-feature": {
+      "description": "Implement a feature following the project control workflow"
+    },
+    "review": {
+      "description": "Run code review against project rules"
+    },
+    "test": {
+      "description": "Run tests and summarize results"
+    },
+    "deploy": {
+      "description": "Execute deployment with rollback plan"
+    }
+  }
+}

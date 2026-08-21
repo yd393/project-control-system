@@ -45,6 +45,22 @@ AI_COMMANDS_FILES = [
     ".ai/commands/deploy.md",
 ]
 
+OPENCODE_CONFIG_FILE = ".opencode/opencode.json"
+
+OPENCODE_AGENTS_FILES = [
+    ".opencode/agents/frontend.md",
+    ".opencode/agents/backend.md",
+    ".opencode/agents/tester.md",
+    ".opencode/agents/reviewer.md",
+]
+
+OPENCODE_COMMANDS_FILES = [
+    ".opencode/commands/implement-feature.md",
+    ".opencode/commands/review.md",
+    ".opencode/commands/test.md",
+    ".opencode/commands/deploy.md",
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -74,6 +90,9 @@ def main() -> None:
     ai_context_missing = _missing_files(project_root, AI_CONTEXT_FILES)
     ai_skills_missing = _missing_skill_files(project_root, AI_SKILLS_DIRS)
     ai_commands_missing = _missing_files(project_root, AI_COMMANDS_FILES)
+    opencode_config_ok = (project_root / OPENCODE_CONFIG_FILE).is_file()
+    opencode_agents_missing = _missing_files(project_root, OPENCODE_AGENTS_FILES)
+    opencode_commands_missing = _missing_files(project_root, OPENCODE_COMMANDS_FILES)
     git_info = inspect_git(project_root)
 
     result = {
@@ -85,6 +104,9 @@ def main() -> None:
             and not ai_context_missing
             and not ai_skills_missing
             and not ai_commands_missing
+            and opencode_config_ok
+            and not opencode_agents_missing
+            and not opencode_commands_missing
         ),
         "agents_md": agents_md_ok,
         "project_control": {
@@ -106,6 +128,11 @@ def main() -> None:
         "ai_commands": {
             "ok": not ai_commands_missing,
             "missing": ai_commands_missing,
+        },
+        "opencode": {
+            "config": opencode_config_ok,
+            "agents": {"ok": not opencode_agents_missing, "missing": opencode_agents_missing},
+            "commands": {"ok": not opencode_commands_missing, "missing": opencode_commands_missing},
         },
         "git": git_info,
     }
@@ -182,6 +209,26 @@ def print_text(result: dict[str, object]) -> None:
             print(f"{label}: missing")
             for path in section["missing"]:
                 print(f"  - {path}")
+
+    opencode = result["opencode"]
+    if opencode["config"]:
+        print(".opencode/opencode.json: ok")
+    else:
+        print(".opencode/opencode.json: missing")
+
+    if opencode["agents"]["ok"]:
+        print(".opencode/agents/: ok")
+    else:
+        print(".opencode/agents/: missing")
+        for path in opencode["agents"]["missing"]:
+            print(f"  - {path}")
+
+    if opencode["commands"]["ok"]:
+        print(".opencode/commands/: ok")
+    else:
+        print(".opencode/commands/: missing")
+        for path in opencode["commands"]["missing"]:
+            print(f"  - {path}")
 
     git_info = result["git"]
     if git_info["is_repo"]:

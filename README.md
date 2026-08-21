@@ -132,6 +132,34 @@ When `--stack` is provided, `scaffold_project.py` layers a tech-stack skeleton o
 
 Stack files do not overwrite the base layer unless `--force` is used.
 
+## opencode Support
+
+The scaffolded project includes an `.opencode/` directory for [opencode](https://opencode.ai) users:
+
+```text
+project-root/
+└── .opencode/
+    ├── opencode.json          # Main config: loads skills, registers agents/commands
+    ├── agents/
+    │   ├── frontend.md        # Frontend implementation agent
+    │   ├── backend.md         # Backend API agent
+    │   ├── tester.md          # Testing & regression agent
+    │   └── reviewer.md        # Code review agent
+    └── commands/
+        ├── implement-feature.md
+        ├── review.md
+        ├── test.md
+        └── deploy.md
+```
+
+The `opencode.json` automatically:
+- Loads skills from `.ai/skills/`
+- Registers 4 sub-agents (frontend, backend, tester, reviewer)
+- Registers 4 commands (implement-feature, review, test, deploy)
+- Adds project-control/ and .ai/context/ as references
+
+After scaffolding, cd into the project and run `opencode` — the agents and commands will be available immediately.
+
 ## Utility Scripts
 
 All scripts use only Python standard library modules.
