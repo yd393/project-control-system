@@ -11,40 +11,15 @@ import argparse
 from pathlib import Path
 
 
-ZH_DIRS = {
-    "control": "00_总控",
-    "baseline": "01_主线",
-    "execution": "02_执行",
-    "research": "03_研究",
-    "review": "04_复盘",
-    "archive": "99_归档",
-}
-
-EN_DIRS = {
-    "control": "00_control",
-    "baseline": "01_baseline",
-    "execution": "02_execution",
-    "research": "03_research",
-    "review": "04_review",
-    "archive": "99_archive",
-}
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create project-control directories and starter documents."
+        description="Create project-control starter documents."
     )
     parser.add_argument(
         "project_root",
         nargs="?",
         default=".",
         help="Project root to update. Defaults to the current directory.",
-    )
-    parser.add_argument(
-        "--layout",
-        choices=("zh", "en"),
-        default="zh",
-        help="Directory and document naming layout. Defaults to zh.",
     )
     parser.add_argument(
         "--force",
@@ -57,24 +32,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     project_root = Path(args.project_root).expanduser().resolve()
-    docs_root = project_root / "docs"
-    names = ZH_DIRS if args.layout == "zh" else EN_DIRS
+    control_root = project_root / "project-control"
 
     created: list[Path] = []
     skipped: list[Path] = []
 
-    for dirname in names.values():
-        path = docs_root / dirname
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-            created.append(path)
-        else:
-            skipped.append(path)
+    if not control_root.exists():
+        control_root.mkdir(parents=True, exist_ok=True)
+        created.append(control_root)
+    else:
+        skipped.append(control_root)
 
-    documents = starter_documents(args.layout, names)
-    for relative_path, contents in documents.items():
-        path = docs_root / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
+    documents = starter_documents()
+    for filename, contents in documents.items():
+        path = control_root / filename
         if path.exists() and not args.force:
             skipped.append(path)
             continue
@@ -91,79 +62,109 @@ def main() -> None:
             print(f"- {path.relative_to(project_root)}")
 
 
-def starter_documents(layout: str, names: dict[str, str]) -> dict[Path, str]:
-    if layout == "en":
-        return {
-            Path(names["control"]) / "project-control.md": """# Project Control
-
-## Purpose
-
-## Current Status
-
-## Current Mainline
-
-## Boundaries
-
-## Document Map
-
-## Phase Plan
-
-## Next Steps
-
-## Git Change Records
-""",
-            Path(names["control"]) / "phase-tasks.md": """# Phase Tasks
-
-| ID | Layer | Status | Owner | Question | Deliverable | Next Step |
-| --- | --- | --- | --- | --- | --- | --- |
-| T-001 | L0 Decision | Todo | Owner | What decision is needed? | Decision note | Define scope |
-""",
-            Path(names["control"]) / "role-tasks.md": """# Role Tasks
-
-| Role | Responsibility | Current Task | Deliverable | Status |
-| --- | --- | --- | --- | --- |
-| Owner / Decision Maker | Final decision and risk ownership | Define project goal | Decision boundary | Todo |
-| Research Lead | Direction, questions, and proposal review | Identify open questions | Research brief | Todo |
-| Implementation Lead | Implementation or execution plan | Draft approach | Plan or code change | Todo |
-| Execution Agent | Documentation, organization, and records | Maintain project docs | Updated docs | Todo |
-| Reviewer | Risk review and acceptance | Review assumptions | Review note | Todo |
-""",
-        }
-
+def starter_documents() -> dict[str, str]:
     return {
-        Path(names["control"]) / "项目总控.md": """# 项目总控
+        "README.md": """# 项目控制台
 
-## 项目目的
+本目录用于跟踪项目运行状态与协作管理。
 
-## 当前总状态
+## 文件说明
 
-## 当前主线
-
-## 当前边界
-
-## 文档结构入口
-
-## 阶段拆分
-
-## 下一步
-
-## Git 留档
+| 文件 | 用途 |
+|------|------|
+| status.md | 当前阶段、进度、阻塞项 |
+| roadmap.md | 阶段目标与里程碑 |
+| backlog.md | 待办与优先级 |
+| decisions.md | 关键决策记录 |
+| handoff.md | 模型/人员交接摘要 |
 """,
-        Path(names["control"]) / "阶段任务表.md": """# 阶段任务表
+        "status.md": """# 当前状态
 
-| 编号 | 层级 | 状态 | 负责人 | 需要回答的问题 | 交付物 | 下一步 |
-| --- | --- | --- | --- | --- | --- | --- |
-| T-001 | L0 决策层 | 待办 | Owner | 当前需要裁决什么？ | 裁决记录 | 定义边界 |
+## 项目阶段
+
+<!-- TODO: 填写当前阶段，例如：需求分析 / 设计 / 开发 / 测试 / 发布 -->
+
+## 进度概览
+
+| 模块 | 进度 | 状态 |
+|------|------|------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
+
+## 当前阻塞项
+
+<!-- TODO: 列出阻塞当前进度的问题 -->
+
+## 最近更新
+
+- <!-- TODO: YYYY-MM-DD - 更新内容 -->
 """,
-        Path(names["control"]) / "角色任务表.md": """# 角色任务表
+        "roadmap.md": """# 路线图
 
-| 角色 | 职责 | 当前任务 | 交付物 | 状态 |
-| --- | --- | --- | --- | --- |
-| Owner / Decision Maker | 最终决策和风险承担 | 定义项目目标 | 决策边界 | 待办 |
-| Research Lead | 方向判断、问题定义、方案裁决 | 识别未决问题 | 研究简报 | 待办 |
-| Implementation Lead | 实现设计、代码或执行方案 | 起草方案 | 方案或代码改动 | 待办 |
-| Execution Agent | 文档落地、整理、检查、记录 | 维护项目文档 | 更新后的文档 | 待办 |
-| Reviewer | 风险复核、验收、反例检查 | 复核假设 | 复核记录 | 待办 |
+## 里程碑
+
+| 阶段 | 目标 | 预计时间 | 状态 |
+|------|------|----------|------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> | 规划中 |
+
+## 长期目标
+
+<!-- TODO: 描述项目长期愿景 -->
+""",
+        "backlog.md": """# 待办事项
+
+## 高优先级
+
+| 编号 | 任务 | 优先级 | 状态 | 负责人 |
+|------|------|--------|------|--------|
+| <!-- TODO --> | <!-- TODO --> | P0 | 待办 | <!-- TODO --> |
+
+## 中优先级
+
+| 编号 | 任务 | 优先级 | 状态 | 负责人 |
+|------|------|--------|------|--------|
+| <!-- TODO --> | <!-- TODO --> | P1 | 待办 | <!-- TODO --> |
+
+## 低优先级 / 未来考虑
+
+| 编号 | 任务 | 优先级 | 状态 | 负责人 |
+|------|------|--------|------|--------|
+| <!-- TODO --> | <!-- TODO --> | P2 | 待办 | <!-- TODO --> |
+""",
+        "decisions.md": """# 关键决策记录
+
+## 决策模板
+
+| 日期 | 问题 | 决策 | 决策原因 | 影响 |
+|------|------|------|----------|------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
+
+## 已记录决策
+
+<!-- TODO: 按时间顺序添加决策 -->
+""",
+        "handoff.md": """# 交接摘要
+
+## 当前上下文
+
+<!-- TODO: 描述当前项目上下文，方便新模型/人员快速理解 -->
+
+## 待办事项
+
+<!-- TODO: 列出需要继续处理的事项 -->
+
+## 已知问题
+
+<!-- TODO: 列出已知但未解决的问题 -->
+
+## 技术债务
+
+<!-- TODO: 列出需要重构或改进的地方 -->
+
+## 交接记录
+
+| 时间 | 交接人 | 接手人 | 摘要 |
+|------|--------|--------|------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
 """,
     }
 

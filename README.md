@@ -1,6 +1,6 @@
 # Project Control System
 
-Project Control System is a Codex marketplace repository containing a plugin for organizing complex projects into a clear control structure: project control docs, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records.
+Project Control System is a Codex marketplace repository containing a plugin for scaffolding projects and organizing complex work into a clear control structure: an AI collaboration layer, project-control docs, decisions, execution notes, handoffs, and Git-backed change records.
 
 The plugin is intentionally domain-neutral. It can be used for software, research, strategy, product, operations, or long-running personal projects without assuming the project type.
 
@@ -24,7 +24,8 @@ codex plugin add project-control-system@project-control-system
 - A Codex skill for project control workflows.
 - A standard plugin manifest at `plugins/project-control-system/.codex-plugin/plugin.json`.
 - A generated icon asset for Codex plugin UI.
-- Utility scripts for creating and checking project-control docs.
+- A `templates/` directory containing base and tech-stack project skeletons.
+- Utility scripts for scaffolding projects, creating control docs, and checking structure.
 
 ## Installation
 
@@ -46,6 +47,15 @@ plugins/project-control-system
 
 Do not point Codex at the inner `plugins/project-control-system/skills/project-control-system` directory. That directory is the skill component inside the plugin, not the plugin root.
 
+## Why Two Layers?
+
+This repository is intentionally split into two layers:
+
+1. **Marketplace repository** — the outer layer that Codex indexes when you add a plugin marketplace. It contains `.agents/plugins/marketplace.json`, top-level documentation, and one or more plugin packages.
+2. **Plugin package** — the inner layer under `plugins/project-control-system/` that Codex actually installs. It contains the manifest, skill definitions, scripts, assets, and templates.
+
+Keeping the marketplace root separate from the plugin root lets the same repository host multiple plugins, versions, or marketplace metadata without mixing installation files with distribution metadata.
+
 ## Plugin Structure
 
 ```text
@@ -63,55 +73,115 @@ project-control-system/
         │   └── icon.png
         ├── scripts/
         │   ├── check_project_structure.py
-        │   └── create_control_docs.py
-        └── skills/
-            └── project-control-system/
-                ├── SKILL.md
-                └── agents/
-                    └── openai.yaml
+        │   ├── create_control_docs.py
+        │   └── scaffold_project.py
+        ├── skills/
+        │   └── project-control-system/
+        │       ├── SKILL.md
+        │       └── agents/
+        │           └── openai.yaml
+        └── templates/
+            ├── base/
+            ├── typescript-node/
+            └── python/
 ```
 
-## Core Workflow
+## Architecture
 
-The skill guides Codex to:
+### Three-Layer Design
 
-1. Confirm the actual project root before making changes.
-2. Inventory the current project structure, docs, active work, experiments, and archives.
-3. Create or repair control docs.
-4. Split work into phase tasks and role ownership.
-5. Record decisions separately from discussion.
-6. Keep current work and archived work easy to distinguish.
-7. Check Git change records at each meaningful project phase.
+A scaffolded project is organized in three layers, read from outside-in:
+
+1. **`AGENTS.md`** — The entry point for AI assistants. It points to the project control docs and the `.ai/` collaboration layer.
+2. **`project-control/`** — Human-readable project state: status, roadmap, backlog, decisions, handoff notes.
+3. **`.ai/`** — AI-specific collaboration layer: rules, context, skills, commands, templates, hooks, MCP examples, and agent definitions.
+
+This separation keeps project state visible to people while giving AI assistants structured instructions and reusable workflows.
+
+### Base Layer (Tech-Agnostic)
+
+The `base` template always creates:
+
+```text
+project-root/
+├── AGENTS.md
+├── project-control/
+│   ├── README.md
+│   ├── status.md
+│   ├── roadmap.md
+│   ├── backlog.md
+│   ├── decisions.md
+│   └── handoff.md
+└── .ai/
+    ├── rules/
+    ├── context/
+    ├── skills/
+    ├── commands/
+    ├── templates/
+    ├── hooks/
+    ├── mcp/
+    └── agents/
+```
+
+### Optional Tech Stacks
+
+When `--stack` is provided, `scaffold_project.py` layers a tech-stack skeleton on top of the base:
+
+- **`typescript-node`** — `package.json`, `tsconfig.json`, `jest.config.js`, a minimal `src/index.ts`, and a starter test.
+- **`python`** — `pyproject.toml`, a package `src/__init__.py`, and a starter test.
+
+Stack files do not overwrite the base layer unless `--force` is used.
 
 ## Utility Scripts
 
-Create a minimal project-control document set:
+All scripts use only Python standard library modules.
+
+### Scaffold a new project
+
+Create a new project with the AI collaboration layer:
+
+```bash
+python3 plugins/project-control-system/scripts/scaffold_project.py /path/to/project
+```
+
+Add a tech stack:
+
+```bash
+python3 plugins/project-control-system/scripts/scaffold_project.py /path/to/project --stack typescript-node
+python3 plugins/project-control-system/scripts/scaffold_project.py /path/to/project --stack python
+```
+
+Preview changes without writing files:
+
+```bash
+python3 plugins/project-control-system/scripts/scaffold_project.py /path/to/project --stack python --dry-run
+```
+
+Overwrite existing files:
+
+```bash
+python3 plugins/project-control-system/scripts/scaffold_project.py /path/to/project --force
+```
+
+### Create control documents only
+
+If you already have a project and only need the `project-control/` starter documents:
 
 ```bash
 python3 plugins/project-control-system/scripts/create_control_docs.py /path/to/project
 ```
 
-Check whether a project has the expected control structure:
+Use `--force` to overwrite existing starter documents.
+
+### Check project structure
+
+Validate that a project has the expected three-layer structure:
 
 ```bash
 python3 plugins/project-control-system/scripts/check_project_structure.py /path/to/project
 ```
 
-Both scripts default to the Chinese directory layout:
-
-```text
-docs/
-├── 00_总控
-├── 01_主线
-├── 02_执行
-├── 03_研究
-├── 04_复盘
-└── 99_归档
-```
-
-Use `--layout en` for the English directory layout.
-
-The scripts use only Python standard library modules.
+The script checks for `AGENTS.md`, the `project-control/` starter files, and the `.ai/` rules, context, skills, and commands. It also reports Git status. Use `--json` for machine-readable output.
 
 ## Git Change Records
 
@@ -126,7 +196,8 @@ When updating the plugin:
 3. Keep reusable Codex workflow instructions in `plugins/project-control-system/skills/project-control-system/SKILL.md`.
 4. Put executable helpers in `plugins/project-control-system/scripts/`.
 5. Put UI assets in `plugins/project-control-system/assets/`.
-6. Re-run plugin validation after structural changes.
+6. Put project skeletons in `plugins/project-control-system/templates/`. The `base/` template must contain `AGENTS.md`, `project-control/`, and `.ai/`.
+7. Re-run plugin validation after structural changes.
 
 Recommended local checks before publishing:
 
@@ -134,9 +205,10 @@ Recommended local checks before publishing:
 python3 -m json.tool marketplace.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/project-control-system/.codex-plugin/plugin.json >/dev/null
-python3 -m py_compile plugins/project-control-system/scripts/create_control_docs.py plugins/project-control-system/scripts/check_project_structure.py
-python3 plugins/project-control-system/scripts/create_control_docs.py /tmp/project-control-smoke --layout en
-python3 plugins/project-control-system/scripts/check_project_structure.py /tmp/project-control-smoke --layout en
+python3 -m py_compile plugins/project-control-system/scripts/*.py
+python3 plugins/project-control-system/scripts/scaffold_project.py /tmp/project-control-smoke --stack python --dry-run
+python3 plugins/project-control-system/scripts/scaffold_project.py /tmp/project-control-smoke --stack python
+python3 plugins/project-control-system/scripts/check_project_structure.py /tmp/project-control-smoke
 ```
 
 ## Publishing Checklist
@@ -147,5 +219,6 @@ Before uploading to GitHub:
 2. Confirm `plugins/project-control-system/.codex-plugin/plugin.json` is present.
 3. Confirm `plugins/project-control-system/skills/project-control-system/SKILL.md` is present.
 4. Confirm `plugins/project-control-system/assets/icon.png` is present.
-5. Confirm generated files such as `.DS_Store`, `__pycache__/`, and `*.pyc` are not committed.
-6. Run the local checks above.
+5. Confirm `plugins/project-control-system/templates/base/` contains `AGENTS.md`, `project-control/`, and `.ai/`.
+6. Confirm generated files such as `.DS_Store`, `__pycache__/`, and `*.pyc` are not committed.
+7. Run the local checks above.

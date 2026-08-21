@@ -9,34 +9,40 @@ import subprocess
 from pathlib import Path
 
 
-ZH_DIRS = [
-    "00_总控",
-    "01_主线",
-    "02_执行",
-    "03_研究",
-    "04_复盘",
-    "99_归档",
+PROJECT_CONTROL_FILES = [
+    "project-control/README.md",
+    "project-control/status.md",
+    "project-control/roadmap.md",
+    "project-control/backlog.md",
+    "project-control/decisions.md",
+    "project-control/handoff.md",
 ]
 
-ZH_DOCS = [
-    "00_总控/项目总控.md",
-    "00_总控/阶段任务表.md",
-    "00_总控/角色任务表.md",
+AI_RULES_FILES = [
+    ".ai/rules/coding.md",
+    ".ai/rules/testing.md",
+    ".ai/rules/security.md",
+    ".ai/rules/git.md",
 ]
 
-EN_DIRS = [
-    "00_control",
-    "01_baseline",
-    "02_execution",
-    "03_research",
-    "04_review",
-    "99_archive",
+AI_CONTEXT_FILES = [
+    ".ai/context/architecture.md",
+    ".ai/context/domain.md",
+    ".ai/context/decisions.md",
 ]
 
-EN_DOCS = [
-    "00_control/project-control.md",
-    "00_control/phase-tasks.md",
-    "00_control/role-tasks.md",
+AI_SKILLS_DIRS = [
+    ".ai/skills/add-api",
+    ".ai/skills/fix-bug",
+    ".ai/skills/ui-review",
+    ".ai/skills/release",
+]
+
+AI_COMMANDS_FILES = [
+    ".ai/commands/implement-feature.md",
+    ".ai/commands/review.md",
+    ".ai/commands/test.md",
+    ".ai/commands/deploy.md",
 ]
 
 
@@ -51,12 +57,6 @@ def parse_args() -> argparse.Namespace:
         help="Project root to check. Defaults to the current directory.",
     )
     parser.add_argument(
-        "--layout",
-        choices=("auto", "zh", "en"),
-        default="auto",
-        help="Expected layout. Defaults to auto.",
-    )
-    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit JSON instead of text.",
@@ -67,30 +67,47 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     project_root = Path(args.project_root).expanduser().resolve()
-    layout = detect_layout(project_root, args.layout)
-    expected_dirs = ZH_DIRS if layout == "zh" else EN_DIRS
-    expected_docs = ZH_DOCS if layout == "zh" else EN_DOCS
 
-    docs_root = project_root / "docs"
-    missing_dirs = [
-        f"docs/{dirname}"
-        for dirname in expected_dirs
-        if not (docs_root / dirname).is_dir()
-    ]
-    missing_docs = [
-        f"docs/{doc}"
-        for doc in expected_docs
-        if not (docs_root / doc).is_file()
-    ]
+    agents_md_ok = (project_root / "AGENTS.md").is_file()
+    project_control_missing = _missing_files(project_root, PROJECT_CONTROL_FILES)
+    ai_rules_missing = _missing_files(project_root, AI_RULES_FILES)
+    ai_context_missing = _missing_files(project_root, AI_CONTEXT_FILES)
+    ai_skills_missing = _missing_skill_files(project_root, AI_SKILLS_DIRS)
+    ai_commands_missing = _missing_files(project_root, AI_COMMANDS_FILES)
     git_info = inspect_git(project_root)
 
     result = {
         "project_root": str(project_root),
-        "layout": layout,
-        "missing_dirs": missing_dirs,
-        "missing_docs": missing_docs,
+        "ok": (
+            agents_md_ok
+            and not project_control_missing
+            and not ai_rules_missing
+            and not ai_context_missing
+            and not ai_skills_missing
+            and not ai_commands_missing
+        ),
+        "agents_md": agents_md_ok,
+        "project_control": {
+            "ok": not project_control_missing,
+            "missing": project_control_missing,
+        },
+        "ai_rules": {
+            "ok": not ai_rules_missing,
+            "missing": ai_rules_missing,
+        },
+        "ai_context": {
+            "ok": not ai_context_missing,
+            "missing": ai_context_missing,
+        },
+        "ai_skills": {
+            "ok": not ai_skills_missing,
+            "missing": ai_skills_missing,
+        },
+        "ai_commands": {
+            "ok": not ai_commands_missing,
+            "missing": ai_commands_missing,
+        },
         "git": git_info,
-        "ok": not missing_dirs and not missing_docs,
     }
 
     if args.json:
@@ -101,13 +118,17 @@ def main() -> None:
     raise SystemExit(0 if result["ok"] else 1)
 
 
-def detect_layout(project_root: Path, requested: str) -> str:
-    if requested in ("zh", "en"):
-        return requested
-    docs_root = project_root / "docs"
-    zh_score = sum((docs_root / dirname).exists() for dirname in ZH_DIRS)
-    en_score = sum((docs_root / dirname).exists() for dirname in EN_DIRS)
-    return "zh" if zh_score >= en_score else "en"
+def _missing_files(project_root: Path, paths: list[str]) -> list[str]:
+    return [path for path in paths if not (project_root / path).is_file()]
+
+
+def _missing_skill_files(project_root: Path, skill_dirs: list[str]) -> list[str]:
+    missing = []
+    for skill_dir in skill_dirs:
+        skill_md = f"{skill_dir}/SKILL.md"
+        if not (project_root / skill_md).is_file():
+            missing.append(skill_md)
+    return missing
 
 
 def inspect_git(project_root: Path) -> dict[str, object]:
@@ -140,23 +161,27 @@ def inspect_git(project_root: Path) -> dict[str, object]:
 
 def print_text(result: dict[str, object]) -> None:
     print(f"Project root: {result['project_root']}")
-    print(f"Layout: {result['layout']}")
 
-    missing_dirs = result["missing_dirs"]
-    missing_docs = result["missing_docs"]
-    if missing_dirs:
-        print("Missing directories:")
-        for path in missing_dirs:
-            print(f"- {path}")
+    if result["agents_md"]:
+        print("AGENTS.md: ok")
     else:
-        print("Directories: ok")
+        print("AGENTS.md: missing")
 
-    if missing_docs:
-        print("Missing starter documents:")
-        for path in missing_docs:
-            print(f"- {path}")
-    else:
-        print("Starter documents: ok")
+    sections = [
+        ("project-control/", result["project_control"]),
+        (".ai/rules/", result["ai_rules"]),
+        (".ai/context/", result["ai_context"]),
+        (".ai/skills/", result["ai_skills"]),
+        (".ai/commands/", result["ai_commands"]),
+    ]
+
+    for label, section in sections:
+        if section["ok"]:
+            print(f"{label}: ok")
+        else:
+            print(f"{label}: missing")
+            for path in section["missing"]:
+                print(f"  - {path}")
 
     git_info = result["git"]
     if git_info["is_repo"]:

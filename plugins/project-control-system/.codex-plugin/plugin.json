@@ -1,7 +1,7 @@
 {
   "name": "project-control-system",
-  "version": "0.1.0",
-  "description": "A general project control system for organizing complex work into control docs, phase tasks, ownership, decisions, reviews, archives, and Git-backed change records.",
+  "version": "0.2.0",
+  "description": "A general project control and scaffolding system for bootstrapping projects with AI collaboration layers (AGENTS.md, project-control/, .ai/) and organizing complex work into control docs, phase tasks, ownership, decisions, reviews, archives, and Git-backed change records.",
   "author": {
     "name": "Project Control Co-Creation"
   },
@@ -13,12 +13,16 @@
     "project-control",
     "project-management",
     "documentation",
-    "organization"
+    "organization",
+    "scaffolding",
+    "ai-collaboration",
+    "project-structure",
+    "templates"
   ],
   "interface": {
     "displayName": "项目总控",
-    "shortDescription": "Organize complex projects into clear control docs.",
-    "longDescription": "A general project control plugin for structuring folders, control documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records without assuming a specific project domain.",
+    "shortDescription": "Bootstrap projects with AI collaboration layers and organize control docs.",
+    "longDescription": "A general project control and scaffolding plugin for bootstrapping projects with AI collaboration layers. It uses a three-layer architecture: AGENTS.md as the entry point for AI agents, project-control/ for control documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records, and .ai/ for reusable AI skills, rules, and commands. Optional tech-stack templates can be applied without assuming a specific project domain.",
     "developerName": "Project Control Co-Creation",
     "category": "Productivity",
     "capabilities": [
@@ -26,8 +30,9 @@
       "Review"
     ],
     "defaultPrompt": [
-      "Organize this project and prepare Git change records.",
-      "Create control docs, phase tasks, and ownership.",
+      "Scaffold this project with AGENTS.md, project-control/, and .ai/ collaboration layer.",
+      "Create control docs, phase tasks, and ownership in project-control/.",
+      "Set up AI skills, rules, and commands in .ai/ for reusable workflows.",
       "Separate current work, research, reviews, and archives."
     ],
     "brandColor": "#2563EB",

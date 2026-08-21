@@ -9,6 +9,8 @@ description: Use when a project is becoming complex and needs a general control 
 
 把一个正在变复杂的项目整理成可推进、可追踪、可复盘的结构。
 
+本 skill 现在支持两层能力：一是**工程脚手架**（为项目搭建 AGENTS.md 入口、project-control/ 管理层、.ai/ 协作层）；二是**项目控制**（阶段拆分、角色分配、决策记录、复盘归档）。两层可以独立使用，也可以组合使用。
+
 这个 skill 不绑定任何领域。不要默认它是量化、软件、产品或研究项目；先从项目现状中提取主线、阶段、角色、决策和产物。
 
 ## 适用场景
@@ -16,7 +18,7 @@ description: Use when a project is becoming complex and needs a general control 
 使用本 skill，当用户需要：
 
 ```text
-1. 整理项目文件夹层级。
+1. 搭建或整理项目工程骨架与 AI 协作层。
 2. 建立或修复总控文档。
 3. 把混在一起的任务、决策、复盘、草稿分类。
 4. 按阶段拆分后续任务。
@@ -39,6 +41,9 @@ description: Use when a project is becoming complex and needs a general control 
 7. 先整理现状，再决定是否迁移文件或创建新文档。
 8. 先确认实际项目根目录，再整理文档、目录和 Git 留档。
 9. 每完成一个可解释阶段，都要考虑是否需要 Git 留档。
+10. AGENTS.md 是 AI 入口，动态状态放 project-control/status.md，避免频繁改动 AGENTS.md 导致上下文膨胀。
+11. base 层（AGENTS.md + project-control/ + .ai/）跨技术栈复用，业务骨架（src/、tests/ 等）仅在用户明确要求时添加。
+12. .ai/skills/ 使用 YAML frontmatter + Markdown，兼容多模型阅读与自动路由。
 ```
 
 ## 默认文件夹结构
@@ -46,47 +51,69 @@ description: Use when a project is becoming complex and needs a general control 
 优先使用这套通用结构；如果项目已有清晰惯例，贴合现有惯例调整命名。
 
 ```text
-docs/
-├── 00_control/      # 总控、阶段任务、角色任务、决策入口
-├── 01_baseline/     # 当前主线、版本边界、稳定口径
-├── 02_execution/    # 执行方案、操作手册、日志字段、运行规则
-├── 03_research/     # 新假设、实验方向、候选方案、未验证想法
-├── 04_review/       # 回测、复盘、结果总结、验收记录
-└── 99_archive/      # 旧稿、备份、废弃路线、历史材料
+AGENTS.md                    # AI 入口：短总控摘要 + 导航
+project-control/             # 项目运行与协作管理层
+├── README.md                # 控制台入口
+├── status.md                # 当前阶段、进度、阻塞项
+├── roadmap.md               # 阶段目标与里程碑
+├── backlog.md               # 待办与优先级
+├── decisions.md             # 关键决策记录
+└── handoff.md               # 模型/人员交接摘要
+
+.ai/                         # AI 协作配置层
+├── rules/                   # 强制约束（编码、测试、安全、Git）
+├── context/                 # 稳定项目背景（架构、领域、决策）
+├── skills/                  # 按需任务手册（YAML + Markdown）
+├── commands/                # 可复用任务入口
+├── agents/                  # 可选子 Agent 角色定义
+├── mcp/                     # 外部工具/服务说明
+├── hooks/                   # 自动检查点
+└── templates/               # 可复用模板
+
+[可选：技术栈骨架]
+src/                         # 业务代码
+tests/                       # 测试
+package.json / pyproject.toml # 项目元数据
 ```
 
-如果用户偏好中文目录，可使用：
+## 工程脚手架
+
+默认只生成 **base 层**：`AGENTS.md`、`project-control/`、`.ai/`。这三层是技术无关的，可以跨语言、跨框架复用。
+
+如果用户明确需要技术栈骨架（例如 TypeScript/Node 或 Python），再叠加对应模板：
 
 ```text
-docs/
-├── 00_总控
-├── 01_主线
-├── 02_执行
-├── 03_研究
-├── 04_复盘
-└── 99_归档
+templates/
+├── base/                    # 通用层（默认）
+├── typescript-node/         # base + tsconfig、jest、src/、tests/
+└── python/                  # base + pyproject.toml、src/、tests/
 ```
+
+`project-control/` 属于"项目运行与协作管理层"，不只是给 AI 读的背景资料。独立出来最清晰，也更适合多模型/多人共同使用。
+
+使用 `scaffold_project.py` 生成完整骨架；使用 `create_control_docs.py` 仅生成 `project-control/` 控制文档。
 
 ## 标准文档
 
 最小可用文档集：
 
 ```text
-docs/00_control/项目总控.md
-docs/00_control/阶段任务表.md
-docs/00_control/角色任务表.md
+AGENTS.md
+project-control/README.md
+project-control/status.md
+project-control/roadmap.md
+project-control/backlog.md
+project-control/decisions.md
+project-control/handoff.md
 ```
 
-按需要再增加：
+按需要再增加 `.ai/` 下的文档：
 
 ```text
-docs/01_baseline/主线定义.md
-docs/01_baseline/版本边界.md
-docs/02_execution/执行方案.md
-docs/02_execution/操作手册.md
-docs/02_execution/日志字段.md
-docs/03_research/研究计划.md
-docs/04_review/复盘记录.md
+.ai/context/architecture.md
+.ai/context/domain.md
+.ai/rules/coding.md
+.ai/skills/<skill-name>/SKILL.md
 ```
 
 ## 工作流
@@ -102,7 +129,7 @@ docs/04_review/复盘记录.md
 4. 已存在的 docs、src、strategies、package、配置文件或业务文档所在目录。
 ```
 
-如果插件目录和实际代码目录不是同一个地方，所有项目整理、文档创建、归档和 Git 留档都必须围绕实际项目根目录进行。
+同时检查项目是否已有 `AGENTS.md`、`project-control/` 或 `.ai/`。如果已存在，盘点后再决定是补充还是重建。
 
 如果实际项目目录不在当前可读写范围内，不要猜测或绕开权限；先说明需要访问哪个路径，再等待用户确认或授权。
 
@@ -116,27 +143,37 @@ docs/04_review/复盘记录.md
 3. 哪些内容是实验、草稿或历史。
 4. 当前未解决问题有哪些。
 5. 用户已经明确的边界是什么。
+6. 是否已有 AGENTS.md / project-control/ / .ai/ 的雏形。
 ```
 
 不要先大规模移动文件。先形成判断，再小步整理。
 
-### 3. 建立总控
+### 3. 工程骨架初始化
 
-总控文档包含：
+如果项目缺少 `AGENTS.md`、`project-control/` 或 `.ai/`，先搭建 base 层：
 
 ```text
-1. 项目目的。
-2. 当前总状态。
-3. 当前主线。
-4. 当前边界。
-5. 文档结构入口。
-6. 阶段拆分。
-7. 下一步任务入口。
+1. 生成 AGENTS.md（短总控摘要 + 导航）。
+2. 生成 project-control/ 下的 6 个控制文档。
+3. 生成 .ai/ 下的规则、上下文、技能、命令等配置。
 ```
+
+仅在用户明确要求时，叠加技术栈骨架（`--stack typescript-node` 或 `--stack python`）。
+
+不要在用户未同意的情况下覆盖已有文件。使用 `--dry-run` 预览，使用 `--force` 谨慎覆盖。
+
+### 4. 建立总控
+
+总控由两部分组成：
+
+- **AGENTS.md**：静态入口。包含项目目标、当前阶段、最高优先级、绝对禁止事项、必读文件导航。保持简短，不频繁改动。
+- **project-control/status.md**：动态状态。包含阶段、进度、阻塞项、最近更新。每次状态变化时更新。
+
+project-control/README.md 说明各文件用途，project-control/roadmap.md 规划里程碑，project-control/backlog.md 跟踪待办。
 
 总控文档避免记录长讨论和详细方案。详细内容放专项文档，只在总控里链接。
 
-### 4. 拆阶段任务
+### 5. 拆阶段任务
 
 阶段任务表使用通用层级：
 
@@ -159,7 +196,7 @@ L4：验证 / 复盘层
 下一步
 ```
 
-### 5. 拆角色任务
+### 6. 拆角色任务
 
 角色不要写死为具体模型名，除非用户明确需要。优先使用通用角色：
 
@@ -173,7 +210,7 @@ Reviewer：风险复核、验收、反例检查
 
 如果用户有自己的角色体系，沿用用户体系。
 
-### 6. 记录裁决
+### 7. 记录裁决
 
 当出现方案分歧或风险问题时，裁决记录必须写清：
 
@@ -186,9 +223,9 @@ Reviewer：风险复核、验收、反例检查
 6. 下一位角色要交付什么。
 ```
 
-不要把“讨论中”伪装成“已裁决”。
+不要把"讨论中"伪装成"已裁决"。裁决记录写入 `project-control/decisions.md`。
 
-### 7. 维护归档
+### 8. 维护归档
 
 归档原则：
 
@@ -199,7 +236,9 @@ Reviewer：风险复核、验收、反例检查
 4. 备份文件不要留在根目录或主工作区。
 ```
 
-### 8. 变更留档
+可在 `project-control/` 同级建立 `archive/` 目录，或在 `project-control/handoff.md` 中记录历史交接。
+
+### 9. 变更留档
 
 Git 是默认的项目留档方式。每完成一个明确、可解释的小阶段，都要检查是否应该留档：
 
@@ -226,7 +265,9 @@ Git 是默认的项目留档方式。每完成一个明确、可解释的小阶�
 如果用户明确授权 Codex 提交，可以在阶段完成后执行 Git 留档。提交信息要简短说明本阶段成果，例如：
 
 ```text
+scaffold: add AI collaboration layer (AGENTS.md, .ai/, project-control/)
 docs: establish project control structure
+feat: add typescript-node stack skeleton
 docs: add phase task table
 docs: archive outdated project drafts
 docs: record project decision
@@ -238,7 +279,7 @@ docs: record project decision
 
 ## 输出风格
 
-用户要“整理项目”时，优先实际创建或更新文档和目录。
+用户要"整理项目"时，优先实际创建或更新文档和目录。
 
 完成后简短说明：
 
@@ -247,7 +288,8 @@ docs: record project decision
 2. 新增或更新了哪些文档。
 3. 当前下一步是什么。
 4. 哪些内容没有动。
-5. Git 留档状态：是否已提交、建议提交信息、哪些改动未提交及原因。
+5. 脚手架状态：base 层是否已生成，技术栈是否已叠加。
+6. Git 留档状态：是否已提交、建议提交信息、哪些改动未提交及原因。
 ```
 
 除非用户要求，不要输出很长的项目管理理论。
@@ -260,6 +302,6 @@ docs: record project decision
 3. 不为了整洁而擅自删除资料。
 4. 不把所有细节塞进总控文档。
 5. 不在方案未确认前推动代码或执行层大改。
-6. 不默认插件目录就是项目目录。
+6. 不默认插件目录就是项目目录；也不把 base 层强加到不需要 AI 协作的项目上。
 7. 不默认替用户提交 Git；没有明确授权时只提醒和建议。
 ```
