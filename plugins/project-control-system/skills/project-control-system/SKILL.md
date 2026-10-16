@@ -1,6 +1,6 @@
 ---
 name: project-control-system
-description: Use when a project is becoming complex and needs a general control system for folders, documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records. Use for software, research, strategy, product, operations, or long-running personal projects that need structure without domain-specific assumptions.
+description: Use when a project is becoming complex and needs a general control system for folders, documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records. Also use when organizing files in a project or an ordinary folder such as Downloads or Desktop: inventory, classify, find duplicate content, move, rename, archive, and record the changes. Use for software, research, strategy, product, operations, or long-running personal projects that need structure without domain-specific assumptions.
 ---
 
 # 项目总控
@@ -9,7 +9,7 @@ description: Use when a project is becoming complex and needs a general control 
 
 把一个正在变复杂的项目整理成可推进、可追踪、可复盘的结构。
 
-本 skill 现在支持两层能力：一是**工程脚手架**（为项目搭建 AGENTS.md 入口、project-control/ 管理层、.ai/ 协作层）；二是**项目控制**（阶段拆分、角色分配、决策记录、复盘归档）。两层可以独立使用，也可以组合使用。
+本 skill 支持三类能力：一是**工程脚手架**（为项目搭建 AGENTS.md 入口、project-control/ 管理层、.ai/ 协作层）；二是**项目控制**（阶段拆分、角色分配、决策记录、复盘归档）；三是**文件整理**（盘点、分类、查重、移动、重命名、归档与操作记录，适用于项目和普通目录）。各项能力可以独立使用，也可以组合使用。
 
 这个 skill 不绑定任何领域。不要默认它是量化、软件、产品或研究项目；先从项目现状中提取主线、阶段、角色、决策和产物。
 
@@ -25,6 +25,7 @@ description: Use when a project is becoming complex and needs a general control 
 5. 按角色分配责任和交付物。
 6. 把当前主线、实验分支、归档内容分清。
 7. 防止所有内容堆在一个文档里。
+8. 整理项目资料或普通目录（下载、桌面、照片）：分类、查重、重命名、移动、归档。
 ```
 
 不要把本 skill 当成项目管理软件。它的目标是为文件系统和文档建立清晰秩序。
@@ -116,6 +117,27 @@ project-control/handoff.md
 .ai/skills/<skill-name>/SKILL.md
 ```
 
+## 任务路由
+
+先判断本次任务类型，再选择流程：
+
+```text
+1. 搭建或修复总控（AGENTS.md / project-control/ / .ai/）：走下方工作流第 1–4 步，需要时运行脚手架脚本。
+2. 阶段、角色、裁决、归档、留档：走下方工作流对应步骤。
+3. 文件整理（盘点、分类、查重、移动、重命名、归档文件）：读取 references/file-organization.md，按其中的八步工作流执行。
+```
+
+文件整理分两种模式：
+
+```text
+项目模式：目标是具体项目。先读 AGENTS.md 和已有规则；不自动初始化缺失的总控骨架；
+          AGENTS.md、project-control/、.ai/、.opencode/、.git/、源代码与构建依赖文件不参与按类型重排。
+普通目录模式：下载、桌面、照片等。不创建 AGENTS.md、project-control/ 或 .ai/；
+          遇到嵌套项目当作边界，不递归拆散。
+```
+
+只读盘点与查重使用插件根的 `scripts/inventory_files.py`（从本 skill 目录向上两级定位插件根）。移动、重命名由你按手册逐项执行并记录；不自动删除，不承诺一键回滚。
+
 ## 工作流
 
 ### 1. 确认项目根目录
@@ -149,6 +171,8 @@ project-control/handoff.md
 不要先大规模移动文件。先形成判断，再小步整理。
 
 ### 3. 工程骨架初始化
+
+仅当任务是搭建或修复总控时执行本步；文件整理任务不因缺少骨架而初始化。
 
 如果项目缺少 `AGENTS.md`、`project-control/` 或 `.ai/`，先搭建 base 层：
 
@@ -281,6 +305,8 @@ docs: record project decision
 
 用户要"整理项目"时，优先实际创建或更新文档和目录。
 
+用户要"整理文件"时，按 references/file-organization.md 的授权规则执行：已明确批准的映射直接执行，笼统请求先给清单确认。
+
 完成后简短说明：
 
 ```text
@@ -304,4 +330,5 @@ docs: record project decision
 5. 不在方案未确认前推动代码或执行层大改。
 6. 不默认插件目录就是项目目录；也不把 base 层强加到不需要 AI 协作的项目上。
 7. 不默认替用户提交 Git；没有明确授权时只提醒和建议。
+8. 文件整理不自动删除；批准移动不等于批准删除，删除和覆盖逐项单独确认。
 ```

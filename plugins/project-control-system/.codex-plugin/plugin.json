@@ -1,7 +1,7 @@
 {
   "name": "project-control-system",
   "version": "0.2.0",
-  "description": "A general project control and scaffolding system for bootstrapping projects with AI collaboration layers (AGENTS.md, project-control/, .ai/) and organizing complex work into control docs, phase tasks, ownership, decisions, reviews, archives, and Git-backed change records.",
+  "description": "A general project control and scaffolding system for bootstrapping projects with AI collaboration layers (AGENTS.md, project-control/, .ai/) and organizing complex work into control docs, phase tasks, ownership, decisions, reviews, archives, and Git-backed change records, plus file organization: read-only inventory, duplicate-content detection, and recorded move, rename, and archive workflows.",
   "author": {
     "name": "Project Control Co-Creation"
   },
@@ -17,12 +17,13 @@
     "scaffolding",
     "ai-collaboration",
     "project-structure",
-    "templates"
+    "templates",
+    "file-organization"
   ],
   "interface": {
     "displayName": "项目总控",
-    "shortDescription": "Bootstrap projects with AI collaboration layers and organize control docs.",
-    "longDescription": "A general project control and scaffolding plugin for bootstrapping projects with AI collaboration layers. It uses a three-layer architecture: AGENTS.md as the entry point for AI agents, project-control/ for control documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records, and .ai/ for reusable AI skills, rules, and commands. Optional tech-stack templates can be applied without assuming a specific project domain.",
+    "shortDescription": "Bootstrap projects, organize control docs, and tidy files.",
+    "longDescription": "A general project control and scaffolding plugin for bootstrapping projects with AI collaboration layers. It uses a three-layer architecture: AGENTS.md as the entry point for AI agents, project-control/ for control documents, phase tasks, role ownership, decisions, execution notes, reviews, archives, and Git-backed change records, and .ai/ for reusable AI skills, rules, and commands. Optional tech-stack templates can be applied without assuming a specific project domain. It also guides file organization for projects and ordinary folders such as Downloads: a read-only scanner reports inventory, nested project boundaries, and duplicate content, then moves, renames, and archives are executed item by item within the user's approval and recorded. It never deletes files automatically.",
     "developerName": "Project Control Co-Creation",
     "category": "Productivity",
     "capabilities": [
@@ -33,7 +34,8 @@
       "Scaffold this project with AGENTS.md, project-control/, and .ai/ collaboration layer.",
       "Create control docs, phase tasks, and ownership in project-control/.",
       "Set up AI skills, rules, and commands in .ai/ for reusable workflows.",
-      "Separate current work, research, reviews, and archives."
+      "Separate current work, research, reviews, and archives.",
+      "Inventory and tidy up this folder: classify files, find duplicates, and propose moves before changing anything."
     ],
     "brandColor": "#2563EB",
     "composerIcon": "./assets/icon.png",

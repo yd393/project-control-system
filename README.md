@@ -1,6 +1,6 @@
 # Project Control System
 
-Project Control System is a Codex marketplace repository containing a plugin for scaffolding projects and organizing complex work into a clear control structure: an AI collaboration layer, project-control docs, decisions, execution notes, handoffs, and Git-backed change records.
+Project Control System is a Codex marketplace repository containing a plugin for scaffolding projects and organizing complex work into a clear control structure: an AI collaboration layer, project-control docs, decisions, execution notes, handoffs, and Git-backed change records. It also guides file organization for projects and ordinary folders such as Downloads: inventory, classification, duplicate-content detection, moves, renames, and archives with an operation record.
 
 The plugin is intentionally domain-neutral. It can be used for software, research, strategy, product, operations, or long-running personal projects without assuming the project type.
 
@@ -21,11 +21,11 @@ codex plugin add project-control-system@project-control-system
 ## What It Provides
 
 - A Codex marketplace entry at `.agents/plugins/marketplace.json`.
-- A Codex skill for project control workflows.
+- A Codex skill for project control and file organization workflows, with a file organization handbook loaded on demand.
 - A standard plugin manifest at `plugins/project-control-system/.codex-plugin/plugin.json`.
 - A generated icon asset for Codex plugin UI.
 - A `templates/` directory containing base and tech-stack project skeletons.
-- Utility scripts for scaffolding projects, creating control docs, and checking structure.
+- Utility scripts for scaffolding projects, creating control docs, checking structure, and taking a read-only file inventory.
 
 ## Installation
 
@@ -74,16 +74,21 @@ project-control-system/
         ├── scripts/
         │   ├── check_project_structure.py
         │   ├── create_control_docs.py
+        │   ├── inventory_files.py
         │   └── scaffold_project.py
         ├── skills/
         │   └── project-control-system/
         │       ├── SKILL.md
-        │       └── agents/
-        │           └── openai.yaml
-        └── templates/
-            ├── base/
-            ├── typescript-node/
-            └── python/
+        │       ├── agents/
+        │       │   └── openai.yaml
+        │       └── references/
+        │           └── file-organization.md
+        ├── templates/
+        │   ├── base/
+        │   ├── typescript-node/
+        │   └── python/
+        └── tests/
+            └── test_inventory_files.py
 ```
 
 ## Architecture
@@ -211,6 +216,31 @@ python3 plugins/project-control-system/scripts/check_project_structure.py /path/
 
 The script checks for `AGENTS.md`, the `project-control/` starter files, and the `.ai/` rules, context, skills, and commands. It also reports Git status. Use `--json` for machine-readable output.
 
+### Take a read-only file inventory
+
+Report file counts, logical sizes, extensions, modification time range, the largest files, nested project boundaries, and scan errors:
+
+```bash
+python3 plugins/project-control-system/scripts/inventory_files.py /path/to/folder --json
+```
+
+Add `--duplicates` to group identical content (SHA-256), and repeat `--exclude GLOB` to skip root-relative paths (`PurePosixPath.match` semantics, not gitignore):
+
+```bash
+python3 plugins/project-control-system/scripts/inventory_files.py /path/to/folder --duplicates --exclude 'exports' --exclude '*.tmp' --json
+```
+
+The scanner is read-only, does not follow internal symlinks, and treats nested projects (directories with `.git`, `AGENTS.md`, `project-control/`, `.ai/`, or `.opencode/`) as boundaries. Duplicate groups are candidates, not permission to delete; hard links are reported separately. Exit code 0 means a complete scan, 1 a partial scan, and 2 an invalid root or arguments.
+
+## File Organization
+
+When asked to organize files, the skill loads `plugins/project-control-system/skills/project-control-system/references/file-organization.md` and follows an eight-step workflow: scope, facts, judgment, a concrete move/rename list, execution within what the user approved, per-item records, reference checks, and a handoff summary.
+
+- **Project mode** respects the project's `AGENTS.md` and rules, does not scaffold missing control docs, and never reshuffles `AGENTS.md`, `project-control/`, `.ai/`, `.opencode/`, `.git/`, source code, or build files by type.
+- **Ordinary folder mode** proposes a purpose-first structure and never creates a project-control layer.
+
+Moves and renames are carried out item by item by the skill with no-overwrite checks and a record under `project-control/operations/` or `<folder>/.file-organization/`. The first version has no automatic deletion, general reference rewriter, or one-click rollback.
+
 ## Git Change Records
 
 The skill treats Git as the default project history system, but it does not assume permission to commit. When Codex has not been explicitly authorized to commit, it should only summarize changes, suggest files to review, and propose a commit message.
@@ -234,6 +264,7 @@ python3 -m json.tool marketplace.json >/dev/null
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
 python3 -m json.tool plugins/project-control-system/.codex-plugin/plugin.json >/dev/null
 python3 -m py_compile plugins/project-control-system/scripts/*.py
+python3 -m unittest discover -s plugins/project-control-system/tests -v
 python3 plugins/project-control-system/scripts/scaffold_project.py /tmp/project-control-smoke --stack python --dry-run
 python3 plugins/project-control-system/scripts/scaffold_project.py /tmp/project-control-smoke --stack python
 python3 plugins/project-control-system/scripts/check_project_structure.py /tmp/project-control-smoke
