@@ -59,6 +59,18 @@ def snapshot(root: Path) -> dict[str, tuple[bytes, int]]:
     return result
 
 
+REAL_OPEN = os.open
+
+
+def deny_open(name: str):
+    def fake_open(path, flags, *args, **kwargs):
+        if os.fspath(path) == name:
+            raise PermissionError(13, "Permission denied", name)
+        return REAL_OPEN(path, flags, *args, **kwargs)
+
+    return fake_open
+
+
 class TempDirTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -215,15 +227,7 @@ class InventoryTests(TempDirTestCase):
     def test_partial_scan(self) -> None:
         write(self.root / "ok" / "a.txt", "a")
         write(self.root / "locked" / "b.txt", "b")
-        real_scandir = os.scandir
-        locked = str(self.root / "locked")
-
-        def fake_scandir(path):
-            if os.fspath(path) == locked:
-                raise PermissionError(13, "Permission denied", locked)
-            return real_scandir(path)
-
-        with mock.patch.object(inventory.os, "scandir", side_effect=fake_scandir):
+        with mock.patch.object(inventory.os, "open", side_effect=deny_open("locked")):
             report = inventory.scan_inventory(self.root)
 
         self.assertFalse(report["complete"])
@@ -237,14 +241,14 @@ class InventoryTests(TempDirTestCase):
     def test_file_vanishes_during_scan(self) -> None:
         write(self.root / "a.txt", "a")
         write(self.root / "gone.txt", "g")
-        real_lstat = os.lstat
+        real_stat = os.stat
 
-        def fake_lstat(path, *args, **kwargs):
-            if os.fspath(path).endswith("gone.txt"):
+        def fake_stat(path, *args, **kwargs):
+            if os.fspath(path) == "gone.txt":
                 raise FileNotFoundError(2, "No such file", os.fspath(path))
-            return real_lstat(path, *args, **kwargs)
+            return real_stat(path, *args, **kwargs)
 
-        with mock.patch.object(inventory.os, "lstat", side_effect=fake_lstat):
+        with mock.patch.object(inventory.os, "stat", side_effect=fake_stat):
             report = inventory.scan_inventory(self.root)
 
         self.assertFalse(report["complete"])
@@ -265,6 +269,71 @@ class InventoryTests(TempDirTestCase):
             inventory.main([str(self.root)])
 
         self.assertEqual(snapshot(self.root), before)
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores directory permissions")
+    def test_real_unreadable_directory(self) -> None:
+        write(self.root / "ok.txt", "a")
+        locked = self.root / "locked"
+        write(locked / "b.txt", "b")
+        locked.chmod(0)
+        try:
+            report = inventory.scan_inventory(self.root)
+        finally:
+            locked.chmod(0o755)
+        self.assertFalse(report["complete"])
+        self.assertEqual(paths_of(report), ["ok.txt"])
+        self.assertEqual(report["errors"][0]["path"], "locked")
+        self.assertEqual(report["errors"][0]["kind"], "permission_denied")
+
+    def test_directory_swapped_for_symlink_during_walk(self) -> None:
+        with tempfile.TemporaryDirectory() as outside_tmp:
+            outside = Path(outside_tmp).resolve()
+            write(outside / "secret.txt", "outside")
+            write(self.root / "sub" / "inner.txt", "inside")
+            write(self.root / "z.txt", "z")
+            swapped = []
+
+            def swap_then_open(path, flags, *args, **kwargs):
+                if os.fspath(path) == "sub" and not swapped:
+                    swapped.append(True)
+                    os.rename(self.root / "sub", outside / "moved-sub")
+                    os.symlink(outside, self.root / "sub")
+                return REAL_OPEN(path, flags, *args, **kwargs)
+
+            with mock.patch.object(inventory.os, "open", side_effect=swap_then_open):
+                report = inventory.scan_inventory(self.root)
+
+        self.assertTrue(swapped)
+        self.assertEqual(paths_of(report), ["z.txt"])
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["errors"][0]["path"], "sub")
+        self.assertEqual(report["errors"][0]["kind"], "changed_during_scan")
+
+    def test_directory_replaced_by_other_directory(self) -> None:
+        write(self.root / "sub" / "inner.txt", "inside")
+        swapped = []
+
+        def replace_then_open(path, flags, *args, **kwargs):
+            if os.fspath(path) == "sub" and not swapped:
+                swapped.append(True)
+                os.rename(self.root / "sub", self.root / ".." / f"{self.root.name}-old")
+                write(self.root / "sub" / "new.txt", "new")
+            return REAL_OPEN(path, flags, *args, **kwargs)
+
+        try:
+            with mock.patch.object(inventory.os, "open", side_effect=replace_then_open):
+                report = inventory.scan_inventory(self.root)
+        finally:
+            import shutil
+
+            shutil.rmtree(self.root.parent / f"{self.root.name}-old", ignore_errors=True)
+        self.assertEqual(paths_of(report), [])
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["errors"][0]["kind"], "changed_during_scan")
+
+    def test_empty_exclude_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            inventory.scan_inventory(self.root, excludes=("",))
 
     def test_invalid_root_raises(self) -> None:
         with self.assertRaises(inventory.InvalidRootError):
@@ -403,6 +472,58 @@ class DuplicateTests(TempDirTestCase):
         )
         self.assertEqual(report["summary"]["estimated_reclaimable_bytes"], 4)
 
+    def test_hardlink_sibling_replaced_during_scan(self) -> None:
+        write(self.root / "a.txt", "abc")
+        os.link(self.root / "a.txt", self.root / "a-link.txt")
+        write(self.root / "b.txt", "abc")
+        real_hash = inventory._hash_stable_file
+        replaced = []
+
+        def replace_sibling(path):
+            if path.name in {"a.txt", "a-link.txt"} and not replaced:
+                sibling = "a.txt" if path.name == "a-link.txt" else "a-link.txt"
+                replaced.append(sibling)
+                os.unlink(self.root / sibling)
+                write(self.root / sibling, "xyz")
+            return real_hash(path)
+
+        with mock.patch.object(inventory, "_hash_stable_file", side_effect=replace_sibling):
+            report = inventory.scan_inventory(self.root, duplicates=True)
+
+        sibling = replaced[0]
+        self.assertFalse(report["complete"])
+        self.assertEqual([e["path"] for e in report["errors"]], [sibling])
+        self.assertEqual(report["errors"][0]["kind"], "changed_during_scan")
+        group_paths = [g["paths"] for g in report["duplicate_groups"]]
+        self.assertEqual(len(group_paths), 1)
+        self.assertNotIn(sibling, group_paths[0])
+        self.assertIn("b.txt", group_paths[0])
+        self.assertEqual(report["summary"]["estimated_reclaimable_bytes"], 3)
+
+    def test_parent_swapped_for_symlink_before_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as outside_tmp:
+            outside = Path(outside_tmp).resolve()
+            write(outside / "x.txt", "abc")
+            write(self.root / "a" / "x.txt", "abc")
+            write(self.root / "b" / "y.txt", "abc")
+            real_hash = inventory._hash_stable_file
+            swapped = []
+
+            def swap_parent(path):
+                if not swapped:
+                    swapped.append(True)
+                    os.rename(self.root / "a", outside / "moved-a")
+                    os.symlink(outside, self.root / "a")
+                return real_hash(path)
+
+            with mock.patch.object(inventory, "_hash_stable_file", side_effect=swap_parent):
+                report = inventory.scan_inventory(self.root, duplicates=True)
+
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["duplicate_groups"], [])
+        self.assertEqual(report["errors"][0]["path"], "a/x.txt")
+        self.assertEqual(report["errors"][0]["kind"], "changed_during_scan")
+
     def test_unreadable_hardlink_excludes_all_its_paths(self) -> None:
         write(self.root / "a.txt", "abc")
         os.link(self.root / "a.txt", self.root / "a-link.txt")
@@ -473,18 +594,16 @@ class CliTests(TempDirTestCase):
 
     def test_partial_scan_exit_code(self) -> None:
         write(self.root / "locked" / "a.txt", "a")
-        real_scandir = os.scandir
-        locked = str(self.root / "locked")
-
-        def fake_scandir(path):
-            if os.fspath(path) == locked:
-                raise PermissionError(13, "Permission denied", locked)
-            return real_scandir(path)
-
-        with mock.patch.object(inventory.os, "scandir", side_effect=fake_scandir):
+        with mock.patch.object(inventory.os, "open", side_effect=deny_open("locked")):
             code, out, _ = self.run_cli(str(self.root), "--json")
         self.assertEqual(code, 1)
         self.assertFalse(json.loads(out)["complete"])
+
+    def test_empty_exclude_is_invalid_argument(self) -> None:
+        code, out, err = self.run_cli(str(self.root), "--exclude", "", "--json")
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("exclude", err)
 
     def test_bad_argument_uses_argparse(self) -> None:
         code, out, err = self.run_cli("--no-such-flag")

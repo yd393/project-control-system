@@ -17,6 +17,7 @@ Exit codes: 0 complete scan, 1 partial scan, 2 invalid root or arguments.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -43,6 +44,8 @@ DEFAULT_PRUNED_DIRS = frozenset(
 )
 IGNORED_FILES = frozenset({".DS_Store"})
 PROJECT_MARKERS = (".git", "AGENTS.md", "project-control", ".ai", ".opencode")
+DIR_FLAGS = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+NOFOLLOW = os.O_NOFOLLOW
 
 
 class InvalidRootError(ValueError):
@@ -70,11 +73,22 @@ def scan_inventory(
         raise InvalidRootError(f"root does not exist: {root_path}") from exc
     if not resolved.is_dir():
         raise InvalidRootError(f"root is not a directory: {resolved}")
+    excludes = tuple(excludes)
+    for pattern in excludes:
+        _validate_exclude(pattern)
 
     files: list[dict[str, object]] = []
     skipped: list[dict[str, str]] = []
     errors: list[dict[str, str]] = []
-    _walk(resolved, "", tuple(excludes), files, skipped, errors)
+    try:
+        root_fd = os.open(resolved, DIR_FLAGS)
+    except OSError as exc:
+        errors.append(_error(".", exc))
+    else:
+        try:
+            _walk(root_fd, "", excludes, files, skipped, errors)
+        finally:
+            os.close(root_fd)
 
     files.sort(key=lambda item: item["path"])
     skipped.sort(key=lambda item: item["path"])
@@ -99,15 +113,20 @@ def scan_inventory(
 
 
 def _walk(
-    directory: Path,
+    dir_fd: int,
     rel_dir: str,
     excludes: tuple[str, ...],
     files: list[dict[str, object]],
     skipped: list[dict[str, str]],
     errors: list[dict[str, str]],
 ) -> None:
+    """Walk an already opened directory without following any symlink.
+
+    Children are opened relative to ``dir_fd`` with O_NOFOLLOW, so a directory
+    swapped for a symlink after listing cannot lead the scan outside the root.
+    """
     try:
-        with os.scandir(os.fspath(directory)) as iterator:
+        with os.scandir(dir_fd) as iterator:
             entries = sorted(iterator, key=lambda entry: entry.name)
     except OSError as exc:
         errors.append(_error(rel_dir or ".", exc))
@@ -129,10 +148,8 @@ def _walk(
                 skipped.append({"path": rel, "reason": "default_excluded"})
             elif _is_excluded(rel, excludes):
                 skipped.append({"path": rel, "reason": "excluded"})
-            elif _is_project(Path(entry.path)):
-                skipped.append({"path": rel, "reason": "nested_project"})
             else:
-                _walk(Path(entry.path), rel, excludes, files, skipped, errors)
+                _walk_child(dir_fd, entry, rel, excludes, files, skipped, errors)
             continue
 
         if entry.name in IGNORED_FILES:
@@ -141,7 +158,7 @@ def _walk(
             skipped.append({"path": rel, "reason": "excluded"})
             continue
         try:
-            info = os.lstat(entry.path)
+            info = os.stat(entry.name, dir_fd=dir_fd, follow_symlinks=False)
         except OSError as exc:
             errors.append(_error(rel, exc))
             continue
@@ -159,26 +176,92 @@ def _walk(
         )
 
 
+def _walk_child(
+    dir_fd: int,
+    entry: os.DirEntry,
+    rel: str,
+    excludes: tuple[str, ...],
+    files: list[dict[str, object]],
+    skipped: list[dict[str, str]],
+    errors: list[dict[str, str]],
+) -> None:
+    try:
+        listed = entry.stat(follow_symlinks=False)
+        child_fd = os.open(entry.name, DIR_FLAGS | NOFOLLOW, dir_fd=dir_fd)
+    except OSError as exc:
+        errors.append(_error(rel, exc))
+        return
+    try:
+        opened = os.fstat(child_fd)
+        if (opened.st_dev, opened.st_ino) != (listed.st_dev, listed.st_ino):
+            errors.append(_error(rel, FileChangedError("directory replaced during scan")))
+        elif _is_project(child_fd):
+            skipped.append({"path": rel, "reason": "nested_project"})
+        else:
+            _walk(child_fd, rel, excludes, files, skipped, errors)
+    finally:
+        os.close(child_fd)
+
+
+def _validate_exclude(pattern: str) -> str:
+    if not pattern:
+        raise ValueError("exclude pattern must not be empty")
+    try:
+        PurePosixPath("probe").match(pattern)
+    except ValueError as exc:
+        raise ValueError(f"invalid exclude pattern {pattern!r}: {exc}") from exc
+    return pattern
+
+
+def _exclude_arg(value: str) -> str:
+    try:
+        return _validate_exclude(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
 def _is_excluded(rel: str, excludes: tuple[str, ...]) -> bool:
     path = PurePosixPath(rel)
     return any(path.match(pattern) for pattern in excludes)
 
 
-def _is_project(directory: Path) -> bool:
-    return any(os.path.lexists(directory / marker) for marker in PROJECT_MARKERS)
+def _is_project(dir_fd: int) -> bool:
+    for marker in PROJECT_MARKERS:
+        try:
+            os.stat(marker, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return True  # unreadable marker: keep the boundary conservative
+        return True
+    return False
+
+
+def _open_no_follow(path: Path) -> int:
+    """Open an absolute, resolved path without following any symlink in it."""
+    parts = path.parts
+    fd = os.open(parts[0], DIR_FLAGS)
+    try:
+        for part in parts[1:-1]:
+            next_fd = os.open(part, DIR_FLAGS | NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return os.open(parts[-1], os.O_RDONLY | NOFOLLOW, dir_fd=fd)
+    finally:
+        os.close(fd)
 
 
 def _hash_stable_file(path: Path) -> str:
     """Return the SHA-256 of ``path``; raise FileChangedError if it changes."""
     digest = hashlib.sha256()
-    with open(path, "rb") as handle:
+    with os.fdopen(_open_no_follow(Path(path)), "rb") as handle:
         before = os.fstat(handle.fileno())
         while True:
             chunk = handle.read(CHUNK_SIZE)
             if not chunk:
                 break
             digest.update(chunk)
-    after = os.lstat(path)
+        after = os.fstat(handle.fileno())
     if _identity(before) != _identity(after):
         raise FileChangedError(f"file changed while hashing: {path}")
     return digest.hexdigest()
@@ -208,7 +291,7 @@ def _find_duplicates(
         by_hash: dict[str, list[list[dict[str, object]]]] = {}
         for members in inodes.values():
             digest = _hash_inode(root, members, errors)
-            if digest is not None:
+            if digest is not None and members:
                 by_hash.setdefault(digest, []).append(members)
         for digest, inode_members in by_hash.items():
             if len(inode_members) < 2:
@@ -226,18 +309,43 @@ def _hash_inode(
     members: list[dict[str, object]],
     errors: list[dict[str, str]],
 ) -> str | None:
-    """Hash one path of an inode; any failure drops the whole inode."""
+    """Hash one path of an inode, then re-verify every path that shares it.
+
+    A failure on the hashed path drops the whole inode. Any other path whose
+    metadata no longer matches the listing is reported and removed from
+    ``members`` so it cannot appear in a duplicate group.
+    """
     item = members[0]
     path = root / item["path"]
-    expected = (item["size"], item["mtime_ns"], item["device"], item["inode"])
     try:
         digest = _hash_stable_file(path)
-        if _identity(os.lstat(path)) != expected:
-            raise FileChangedError(f"file changed after it was listed: {path}")
     except OSError as exc:
         errors.append(_error(item["path"], exc))
         return None
+
+    verified = []
+    for member in members:
+        try:
+            _verify_unchanged(root, member)
+        except OSError as exc:
+            errors.append(_error(member["path"], exc))
+            if member is item:
+                return None
+            continue
+        verified.append(member)
+    members[:] = verified
     return digest
+
+
+def _verify_unchanged(root: Path, item: dict[str, object]) -> None:
+    expected = (item["size"], item["mtime_ns"], item["device"], item["inode"])
+    fd = _open_no_follow(root / item["path"])
+    try:
+        current = os.fstat(fd)
+    finally:
+        os.close(fd)
+    if _identity(current) != expected:
+        raise FileChangedError(f"file changed after it was listed: {item['path']}")
 
 
 def _hardlink_groups(files: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -299,6 +407,8 @@ def _error(rel: str, exc: BaseException) -> dict[str, str]:
         kind = "permission_denied"
     elif isinstance(exc, FileNotFoundError):
         kind = "not_found"
+    elif isinstance(exc, OSError) and exc.errno in (errno.ELOOP, errno.ENOTDIR):
+        kind = "changed_during_scan"  # a symlink or file appeared where a directory was
     else:
         kind = "os_error"
     return {"path": rel, "kind": kind, "message": str(exc)}
@@ -370,6 +480,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--exclude",
         action="append",
         default=[],
+        type=_exclude_arg,
         metavar="GLOB",
         help=(
             "Root-relative POSIX glob, matched with PurePosixPath.match; "
